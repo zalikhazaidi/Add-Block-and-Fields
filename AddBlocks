@@ -1,0 +1,142 @@
+<?php
+/*
+Edit by: Zalikha
+Date: 19 Sept 2022
+Project Task: 
+Instance: my Instances
+Add Fields and Edit Existing Fields in Collections Module, Collect Vals and Credit Notes
+*/
+
+include_once 'include/my/my_SharedFunctions.php';
+$DBconn = my_ConnectDB();
+
+// Turn on debugging level
+$Vtiger_Utils_Log = true;
+include_once('vtlib/Vtiger/Menu.php');
+include_once('vtlib/Vtiger/Module.php');
+
+// ----------------------------- Add new Fields and Edit Existing Fields in Collections Module -----------------------------
+/*Edit existing fields:
+1) Status - set as read only, set created as default and add option
+2) Transfer Method - set as mandatory and add option
+3) Transfer Ref - set as mandatory 
+
+Add fields:
+1) Used Amount
+2) Contact ID
+3) Credit Note ID
+*/
+
+$moduleName = 'Collections';
+$moduleInstance = Vtiger_Module::getInstance($moduleName);
+$blockInstance = Vtiger_Block::getInstance('LBL_COLLECTIONS_INFORMATION', $moduleInstance);
+
+// Set Status as read only
+// To find the fieldid & profileid
+$sql = mysql_query("SELECT * FROM vtigercrm71.vtiger_profile2field
+	INNER JOIN vtigercrm71.vtiger_profile ON vtiger_profile.profileid = vtiger_profile2field.profileid
+	INNER JOIN vtigercrm71.vtiger_field ON vtiger_field.fieldid = vtiger_profile2field.fieldid
+    WHERE vtiger_field.fieldlabel = 'Status' AND vtiger_field.fieldname ='cf_1509'");	//XXX is the field label that you want to edit
+while($row = mysql_fetch_assoc($sql))
+{
+	$fieldId = $row['fieldid'];
+	$profileId = $row['profileid'];
+	
+	mysql_query("UPDATE vtigercrm71.vtiger_profile2field SET readonly = 1 WHERE profileid = ".$profileId." AND fieldid = ".$fieldId.";");
+}
+
+//Set Created option in status as default value
+$sql = mysql_query("SELECT * FROM vtigercrm71.vtiger_field 
+             where fieldlabel = 'Status' and tablename = 'vtiger_collectionscf';");	
+	
+while($row = mysql_fetch_assoc($sql))
+{
+	$fieldId = $row['fieldid'];
+	
+    mysql_query("UPDATE vtigercrm71.vtiger_field SET defaultvalue = 'Created' WHERE fieldid = ".$fieldId.";");
+	
+}
+
+
+// Edit existing field, Status (add option)
+$fieldInstance4 = Vtiger_Field::getInstance('cf_1509', $moduleInstance);
+$fieldInstance4->setPicklistValues( Array ('Partially Used'));
+
+// Edit existing field, Transfer Method (add option)
+$fieldInstance5 = Vtiger_Field::getInstance('cf_1412', $moduleInstance);
+$fieldInstance5->setPicklistValues( Array ('Credit Note'));
+
+
+
+//Rename Reference Num to Tranfer Ref and set Transfer Ref as Mandatory field
+$sql = mysql_query("SELECT * FROM vtigercrm71.vtiger_field 
+             where fieldlabel = 'Reference Num' and tablename = 'vtiger_collectionscf';");	
+	
+while($row = mysql_fetch_assoc($sql))
+{
+	$fieldId = $row['fieldid'];
+	
+    mysql_query("UPDATE vtigercrm71.vtiger_field SET typeofdata = 'V~M~LE~100' WHERE fieldid = ".$fieldId.";");
+}
+
+
+//Add new Field: Used Amount
+$sql = mysql_query("SELECT * FROM vtigercrm71.vtiger_field_seq;");
+$row = mysql_fetch_assoc($sql);
+$cfId = $row['id']+1;
+
+$fieldInstance1 = new Vtiger_Field();
+$fieldInstance1->name = 'cf_'.$cfId;
+$fieldInstance1->table = 'vtiger_collectionscf';	//cf table
+$fieldInstance1->column = 'cf_'.$cfId;
+$fieldInstance1->label = 'Used Amount';	//label
+$fieldInstance1->columntype = 'VARCHAR(100)';
+$fieldInstance1->uitype = 71;	//Picklist
+$fieldInstance1->typeofdata = 'N~O'; 
+$fieldInstance1->sequence = 5; 
+$blockInstance->addField($fieldInstance1);
+
+// Set the field as read only
+// To find the fieldid & profileid
+$sql = mysql_query("SELECT * FROM vtigercrm71.vtiger_profile2field
+	INNER JOIN vtigercrm71.vtiger_profile ON vtiger_profile.profileid = vtiger_profile2field.profileid
+	INNER JOIN vtigercrm71.vtiger_field ON vtiger_field.fieldid = vtiger_profile2field.fieldid
+    WHERE vtiger_field.fieldlabel = 'Used Amount';");	//XXX is the field label that you want to edit
+while($row = mysql_fetch_assoc($sql))
+{
+	$fieldId = $row['fieldid'];
+	$profileId = $row['profileid'];
+	
+	mysql_query("UPDATE vtigercrm71.vtiger_profile2field SET readonly = 1 WHERE profileid = ".$profileId." AND fieldid = ".$fieldId.";");
+}
+
+//Add new Field: Contact ID
+$module = Vtiger_Module::getInstance('Collections'); 
+$block = Vtiger_Block::getInstance('LBL_COLLECTIONS_INFORMATION', $module);
+$fieldInstance2 = new Vtiger_Field();
+$fieldInstance2->name = 'contactid'; 
+$fieldInstance2->label = 'Contact ID'; 
+$fieldInstance2->uitype = 10; 
+$fieldInstance2->typeofdata = 'I~M'; 
+$fieldInstance2->sequence = 7; 
+$block->addField($fieldInstance2); 
+$fieldInstance2->setRelatedModules(Array('Contacts'));
+
+
+//Add new Field: Credit Note ID
+$module = Vtiger_Module::getInstance('Collections'); 
+$blockInstance = Vtiger_Block::getInstance('LBL_COLLECTIONS_INFORMATION', $module);
+$fieldInstance = new Vtiger_Field();
+$fieldInstance->name = 'creditnoteid'; 
+$fieldInstance->label = 'Credit Note ID'; 
+$fieldInstance->uitype = 10; 
+$fieldInstance->typeofdata = 'I~O'; 
+$blockInstance->addField($fieldInstance); 
+$fieldInstance->setRelatedModules(Array('CreditNotes'));
+
+
+
+mysql_close($DBconn);
+echo 'Done!<br>';
+
+?>
